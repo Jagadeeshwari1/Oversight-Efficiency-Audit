@@ -206,5 +206,22 @@ with st.expander("📝 Executive Auditor Summary"):
     - **Top 10 Chart:** Uses a branded patriotic color scheme to highlight the least efficient regions.
     - **Distribution Plot:** The box plot identifies extreme outliers where job subsidies are significantly higher than the national median.
     """)
+    
+# --- DATA TABLE & DOWNLOAD ---
+st.markdown("### 📋 Full Audit Ledger")
+
+# Selection for download
+download_cols = ['area_title', 'State', 'Allocated_Spending', 'Efficiency_Index', 'Salary_Replacement_Ratio', 'Audit_Risk_Level', 'oty_avg_annual_pay_pct_chg']
+csv_data = filtered_df[download_cols].to_csv(index=False).encode('utf-8')
+
+st.download_button(
+    label="📥 DOWNLOAD AUDIT REPORT (CSV)",
+    data=csv_data,
+    file_name='OTB_Forensic_Audit_Export.csv',
+    mime='text/csv',
+    help="Click to download the current filtered view of the audit data."
+)
+
+st.dataframe(filtered_df[download_cols].sort_values('Efficiency_Index', ascending=False), use_container_width=True)
 
 st.button("📥 Export Full Forensic Report")
