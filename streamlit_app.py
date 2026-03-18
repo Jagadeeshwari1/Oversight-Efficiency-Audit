@@ -2,57 +2,19 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
+from sklearn.linear_model import LinearRegression
 
-# 1. Page Configuration
-st.set_page_config(
-    page_title="Open The Books: Forensic Audit",
-    page_icon="🏛️",
-    layout="wide",
-)
-
-# 2. Open The Books Branding (Red & Blue Gradient Header)
-st.markdown("""
-    <style>
-    /* Gradient Header Background */
-    .header-container {
-        background: linear-gradient(90deg, #1E3A8A 0%, #B91C1C 100%);
-        padding: 40px;
-        border-radius: 15px;
-        color: white;
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    /* Metric Card Styling */
-    div[data-testid="stMetric"] {
-        background-color: white;
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 5px solid #1E3A8A;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
-    }
-    .stChatFloatingInputContainer {
-        bottom: 20px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# 1. Page Config
+st.set_page_config(page_title="Open The Books: Predictive Audit", layout="wide")
 
 # --- DATA ENGINE ---
 @st.cache_data
 def load_and_improve_data():
-    try:
-        df = pd.read_csv('audit_data.csv')
-    except Exception as e:
-        st.error(f"Data Connection Error: {e}")
-        st.stop()
-    
+    df = pd.read_csv('audit_data.csv')
     df.columns = df.columns.str.strip()
-    def get_state(title):
-        if ',' in str(title): return title.split(',')[-1].strip()
-        return "National/Other"
     
-    df['State'] = df['area_title'].apply(get_state)
-
-    # Allocation Logic
+    # State & Allocation Logic
+    df['State'] = df['area_title'].apply(lambda x: x.split(',')[-1].strip() if ',' in str(x) else "National")
     state_totals = df.groupby('State').agg({'annual_avg_emplvl': 'sum', 'federal_spending': 'max'}).reset_index()
     state_totals.columns = ['State', 'State_Total_Jobs', 'State_Total_Spending']
     df = df.merge(state_totals, on='State', how='left')
@@ -68,118 +30,83 @@ def load_and_improve_data():
         else: return '✅ Healthy'
     df['Audit_Risk_Level'] = df['Salary_Replacement_Ratio'].apply(assign_risk)
     
+    # --- PREDICTIVE MODELING (ML) ---
+    # We predict Wage Growth based on Allocated Spending
+    X = df[['Allocated_Spending']].values
+    y = df['oty_avg_annual_pay_pct_chg'].values
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    df['Predicted_Wage_Growth'] = model.predict(X)
+    df['Growth_Deficit'] = df['oty_avg_annual_pay_pct_chg'] - df['Predicted_Wage_Growth']
+    
     return df
 
 df = load_and_improve_data()
 
-# --- SIDEBAR: NAVIGATION & AI CHATBOT ---
-with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/8/80/Seal_of_the_United_States_Department_of_the_Treasury.svg", width=80)
-    st.title("🛡️ Forensic Controls")
-    
-    st.markdown("### Filter Results")
-    risk_filter = st.multiselect("Risk Category", options=df['Audit_Risk_Level'].unique(), default=df['Audit_Risk_Level'].unique())
-    search = st.text_input("📍 Search County")
+# --- BRANDED HEADER ---
+st.markdown("""
+    <div style="background: linear-gradient(90deg, #1E3A8A 0%, #B91C1C 100%); padding: 25px; border-radius: 15px; color: white; text-align: center;">
+        <h1 style='margin:0;'>🏛️ OPEN THE BOOKS: PREDICTIVE AUDITOR</h1>
+        <p style='margin:0; opacity:0.9;'>AI-Driven Economic Impact & Wage Growth Prediction</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("### 🤖 AI Auditor Chat")
-    st.caption("Ask questions about the audit findings.")
+# --- SIDEBAR: DYNAMIC AI CHATBOT ---
+with st.sidebar:
+    st.title("🤖 AI Auditor Bot")
+    st.caption("I can now answer specific questions about the data.")
     
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "How can I help you audit these $11.16 Billion in earmarks today?"}]
+        st.session_state.messages = []
 
     for msg in st.session_state.messages:
         st.chat_message(msg["role"]).write(msg["content"])
 
-    if chat_input := st.chat_input("Ask the Auditor..."):
+    if chat_input := st.chat_input("Ex: Which state has the most Red Flags?"):
         st.session_state.messages.append({"role": "user", "content": chat_input})
         st.chat_message("user").write(chat_input)
         
-        # Simple AI Response Logic (Replace with LLM API call if needed)
-        response = f"I've analyzed the {len(df)} records. Currently, there are {len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion'])} critical red flags in the dataset."
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        st.chat_message("assistant").write(response)
+        # --- DYNAMIC RESPONSE LOGIC ---
+        query = chat_input.lower()
+        if "red flag" in query or "market perversion" in query:
+            count = len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion'])
+            top_state = df[df['Audit_Risk_Level'] == '🚨 Market Perversion']['State'].value_counts().idxmax()
+            answer = f"There are {count} Market Perversions. {top_state} has the highest concentration of these red flags."
+        elif "highest spending" in query:
+            max_area = df.loc[df['Allocated_Spending'].idxmax(), 'area_title']
+            answer = f"The area with the highest allocated spending is {max_area}."
+        elif "efficiency" in query:
+            avg_eff = df['Efficiency_Index'].mean()
+            answer = f"The average Efficiency Index across all counties is ${avg_eff:,.2f} per job."
+        else:
+            answer = "I'm analyzing the data. Could you ask specifically about Red Flags, Spending levels, or Efficiency?"
 
-# Filter Data
-filtered_df = df[df['Audit_Risk_Level'].isin(risk_filter)]
-if search:
-    filtered_df = filtered_df[filtered_df['area_title'].str.contains(search, case=False)]
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+        st.chat_message("assistant").write(answer)
 
-# --- HEADER ---
+# --- PREDICTIVE DASHBOARD SECTION ---
+st.header("🔮 Predictive Audit: Wage Growth Forecasting")
 st.markdown("""
-    <div class="header-container">
-        <h1 style='margin:0; font-family:serif; font-size:42px;'>🏛️ OPEN THE BOOKS</h1>
-        <p style='margin:0; font-size:20px; font-weight:lighter; opacity:0.9;'>Forensic Audit: Federal Spending Efficiency & Market Impact</p>
-    </div>
-    """, unsafe_allow_html=True)
+This model uses **Linear Regression** to calculate the 'Expected Wage Growth' based on federal investment. 
+Counties appearing **below** the line are failing to translate taxpayer dollars into citizen income.
+""")
 
-# KPI Scorecards
-m1, m2, m3, m4 = st.columns(4)
-total_spend = df.groupby('State')['State_Total_Spending'].max().sum()
-m1.metric("TOTAL PORTFOLIO", f"${total_spend/1e9:.1f}B")
-m2.metric("AVG EFFICIENCY INDEX", f"${df['Efficiency_Index'].mean():,.0f}")
-m3.metric("RED FLAG COUNT", len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion']))
-m4.metric("AVG WAGE GROWTH", f"{df['oty_avg_annual_pay_pct_chg'].mean():.2f}%")
+fig_pred = px.scatter(df, x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg',
+                 color='Audit_Risk_Level', hover_name='area_title',
+                 trendline="ols", # This adds the predictive regression line
+                 title="Actual vs. Predicted Growth")
+st.plotly_chart(fig_pred, use_container_width=True)
 
-st.divider()
+# Distribution of the "Growth Deficit"
+st.subheader("⚠️ Underperforming Counties (Predictive Deficit)")
+deficit_df = df[df['Growth_Deficit'] < 0].sort_values('Growth_Deficit').head(10)
+fig_bar = px.bar(deficit_df, x='area_title', y='Growth_Deficit', 
+                 title="Top 10 Counties with Highest Wage Growth Deficit (Relative to Spend)",
+                 color_discrete_sequence=['#B91C1C'])
+st.plotly_chart(fig_bar, use_container_width=True)
 
-# --- VISUAL SUITE ---
-
-# Row 1: Correlation and Risk Distribution
-c1, c2 = st.columns([2, 1])
-with c1:
-    st.markdown("#### 📈 Decoupling Analysis: Spending vs. Wage Growth")
-    fig_scatter = px.scatter(filtered_df, x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg',
-                 size='Efficiency_Index', color='Audit_Risk_Level', hover_name='area_title',
-                 color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
-                 template='plotly_white', height=400)
-    st.plotly_chart(fig_scatter, use_container_width=True)
-
-with c2:
-    st.markdown("#### 🥧 Risk Profile Breakdown")
-    fig_pie = px.pie(filtered_df, names='Audit_Risk_Level', hole=0.4,
-                     color='Audit_Risk_Level', color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'})
-    fig_pie.update_layout(showlegend=False, height=350)
-    st.plotly_chart(fig_pie, use_container_width=True)
-
-# Row 2: State Performance & Efficiency Distribution
-c3, c4 = st.columns(2)
-with c3:
-    st.markdown("#### 📊 Top 10 States by Efficiency Index (Cost Per Job)")
-    state_data = filtered_df.groupby('State')['Efficiency_Index'].mean().nlargest(10).reset_index()
-    fig_bar = px.bar(state_data, x='State', y='Efficiency_Index', color='Efficiency_Index', 
-                     color_continuous_scale='Blues')
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-with c4:
-    st.markdown("#### 📉 Taxpayer Burden Distribution")
-    fig_hist = px.histogram(filtered_df, x='Efficiency_Index', color='Audit_Risk_Level',
-                            color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
-                            nbins=40, template='plotly_white')
-    st.plotly_chart(fig_hist, use_container_width=True)
-
-# Row 3: Cumulative Growth Line Chart
-st.markdown("#### 📉 Cumulative Spend vs. Wage Growth Trend")
-line_data = filtered_df.sort_values('Allocated_Spending')
-fig_line = px.line(line_data, x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg', 
-                   template='plotly_white', labels={'Allocated_Spending': 'Allocated Spend ($)'})
-st.plotly_chart(fig_line, use_container_width=True)
-
-# --- CONTENT & DATA TABLE ---
-st.markdown("### 📋 The Audit Ledger")
-st.dataframe(filtered_df[['area_title', 'State', 'Allocated_Spending', 'Efficiency_Index', 'Salary_Replacement_Ratio', 'Audit_Risk_Level']]
-             .sort_values('Efficiency_Index', ascending=False), use_container_width=True)
-
-with st.expander("📝 Auditor's Narrative & Content"):
-    st.markdown("""
-    **Executive Summary:**
-    This dashboard provides a forensic look at the decoupling of federal spending from the private market. 
-    A **Market Perversion** occurs when the federal government spends more to support a job than the actual local worker takes home in salary. 
-    
-    **Key Findings:**
-    1. **Efficiency Index:** Measures the taxpayer dollar amount per local private sector job.
-    2. **Stagnation Zone:** Observe the scatter chart; areas with high spending often correlate with lower-than-average wage growth.
-    3. **Regional Hotspots:** The bar chart highlights states where federal investment is least efficient.
-    """)
-
-st.button("📥 Export Full Forensic Report")
+# --- DATA TABLE ---
+st.header("📋 Audit Ledger with Predictive Metrics")
+st.dataframe(df[['area_title', 'Allocated_Spending', 'oty_avg_annual_pay_pct_chg', 'Predicted_Wage_Growth', 'Growth_Deficit', 'Audit_Risk_Level']]
+             .sort_values('Growth_Deficit'), use_container_width=True)
