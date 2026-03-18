@@ -139,43 +139,49 @@ This audit measures the **Taxpayer Burden Per Job**. When the "Efficiency Index"
 In these red-flagged areas, the government is effectively spending more to *subsidize* a position than the worker actually *earns* in the private market. This often leads to wage stagnation, as shown in the charts below.
 """)
 
-# --- VISUAL SUITE ---
+# --- VISUAL SUITE WITH INTERPRETATIONS ---
 
 # Row 1: Correlation & Risk
 c1, c2 = st.columns([2, 1])
 with c1:
-    st.markdown("#### 📈 Decoupling: Allocated Spend vs. Wage Growth")
-    fig_scatter = px.scatter(filtered_df, x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg',
+    st.markdown("#### 📈 Decoupling Analysis: Spending vs. Wage Growth")
+    fig_scatter = px.scatter(df[df['Audit_Risk_Level'].isin(risk_filter)], x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg',
                  size='Efficiency_Index', color='Audit_Risk_Level', hover_name='area_title',
                  color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
                  template='plotly_white', height=400)
     st.plotly_chart(fig_scatter, use_container_width=True)
+    st.markdown("""<div class="interpretation-text"><b>Auditor Interpretation:</b> This chart tracks if federal dollars are actually "buying" economic growth. 
+    Points in the <b>Red Zone</b> indicate 'Economic Decoupling'—where massive federal investment is failing to result in private-sector wage increases.</div>""", unsafe_allow_html=True)
 
 with c2:
     st.markdown("#### 🥧 Risk Profile Breakdown")
-    fig_pie = px.pie(filtered_df, names='Audit_Risk_Level', hole=0.4,
+    fig_pie = px.pie(df[df['Audit_Risk_Level'].isin(risk_filter)], names='Audit_Risk_Level', hole=0.4,
                      color='Audit_Risk_Level', color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'})
     fig_pie.update_layout(showlegend=False, height=350)
     st.plotly_chart(fig_pie, use_container_width=True)
+    st.markdown("""<div class="interpretation-text"><b>Interpretation:</b> This measures the 'Portfolio Toxicity.' It quantifies what percentage of the audited market is currently being 'Perverted' (Red) or 'Crowded Out' (Yellow).</div>""", unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # Row 2: Top States & Distribution
 c3, c4 = st.columns(2)
 with c3:
-    st.markdown("#### 📊 Top 10 States by Efficiency Index (Cost Per Job)")
-    state_data = filtered_df.groupby('State')['Efficiency_Index'].mean().nlargest(10).reset_index()
-    # Using Open The Books Red and Blue
-    fig_bar = px.bar(state_data, x='State', y='Efficiency_Index', 
-                     color='State', color_discrete_sequence=['#1E3A8A', '#B91C1C'])
+    st.markdown("#### 📊 Top 10 States by Job-Support Cost (Least Efficient)")
+    state_data = df.groupby('State')['Efficiency_Index'].mean().nlargest(10).reset_index()
+    fig_bar = px.bar(state_data, x='State', y='Efficiency_Index', color='State', color_discrete_sequence=['#1E3A8A', '#B91C1C'])
     st.plotly_chart(fig_bar, use_container_width=True)
+    st.markdown("""<div class="interpretation-text"><b>Interpretation:</b> These states represent the highest 'Taxpayer Burden.' 
+    Higher bars show regions where the government is paying the highest premium to support a single local job.</div>""", unsafe_allow_html=True)
 
 with c4:
     st.markdown("#### 📦 Forensic Distribution: Taxpayer Burden per Job")
-    # Using a Box Plot instead of a Histogram to show outliers clearly
-    fig_box = px.box(filtered_df, y='Efficiency_Index', color='Audit_Risk_Level',
+    fig_box = px.box(df[df['Audit_Risk_Level'].isin(risk_filter)], y='Efficiency_Index', color='Audit_Risk_Level',
                      color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
                      template='plotly_white', points='outliers')
     st.plotly_chart(fig_box, use_container_width=True)
-
+    st.markdown("""<div class="interpretation-text"><b>Interpretation:</b> Box plots identify 'Statistical Anomalies.' 
+    The dots above the whiskers are the <b>Forensic Targets</b>—counties where the cost-per-job is so high it is mathematically indefensible.</div>""", unsafe_allow_html=True)
+    
 # Row 3: Trend Line
 st.markdown("#### 📉 Cumulative Spending Trend vs. Economic Growth")
 line_data = filtered_df.sort_values('Allocated_Spending')
