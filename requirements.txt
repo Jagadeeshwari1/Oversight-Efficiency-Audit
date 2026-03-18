@@ -3,5 +3,5 @@ pandas
 plotly
 numpy
 scikit-learn
-openpyxl
+statsmodels
 altair<5
