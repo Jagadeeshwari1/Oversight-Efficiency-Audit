@@ -1,17 +1,54 @@
 @st.cache_data
 def load_and_improve_data():
-    import os
-    # This will show you exactly what files are in the folder
-    files_in_repo = os.listdir(".")
-    st.write("Files Streamlit can see in your repo:", files_in_repo)
-    
-    # Check if our target file is in that list
-    target_file = 'audit_data.xlsx'
-    
-    if target_file not in files_in_repo:
-        st.error(f"❌ '{target_file}' NOT FOUND. Look at the list above—is it spelled differently?")
+    try:
+        # Load the CSV - the most reliable format for GitHub/Linux
+        df = pd.read_csv('audit_data.csv')
+    except Exception as e:
+        st.error(f"❌ Data Loading Error: {e}")
+        st.info("Ensure 'audit_data.csv' is in the root of your GitHub repository.")
         st.stop()
-        
-    df = pd.read_excel(target_file, engine='openpyxl')
-    # ... rest of your code ...
+    
+    # Clean column names for safety
+    df.columns = df.columns.str.strip()
+
+    # 1. Calculation Safety Check
+    # Ensures metrics exist even if they weren't in the raw CSV
+    if 'Efficiency_Index' not in df.columns:
+        df['Efficiency_Index'] = df['federal_spending'] / df['annual_avg_emplvl']
+    
+    if 'Salary_Replacement_Ratio' not in df.columns:
+        df['Salary_Replacement_Ratio'] = df['Efficiency_Index'] / df['avg_annual_pay']
+
+    # 2. Contextual Improvement: Salary Equivalent Count
+    # Shows how many workers' salaries the earmark represents
+    df['Salary_Equivalent_Count'] = df['federal_spending'] / df['avg_annual_pay']
+    
+    # 3. State Benchmarking (Z-Score)
+    # Isolates how extreme a county is compared to its own state
+    def get_state(title):
+        if ',' in str(title):
+            return title.split(',')[-1].strip()
+        return "National/Other"
+    
+    df['State'] = df['area_title'].apply(get_state)
+    
+    state_stats = df.groupby('State')['Efficiency_Index'].agg(['mean', 'std']).reset_index()
+    state_stats.columns = ['State', 'State_Mean', 'State_Std']
+    
+    df = df.merge(state_stats, on='State', how='left')
+    df['State_Std'] = df['State_Std'].replace(0, np.nan) 
+    df['Efficiency_State_ZScore'] = (df['Efficiency_Index'] - df['State_Mean']) / df['State_Std']
+    df['Efficiency_State_ZScore'] = df['Efficiency_State_ZScore'].fillna(0)
+    
+    # 4. Traffic Light Risk Levels
+    def assign_risk(ratio):
+        if ratio > 1.0: 
+            return '🚨 Market Perversion'
+        elif ratio >= 0.5: 
+            return '🟡 Watchlist'
+        else: 
+            return '✅ Healthy'
+    
+    df['Audit_Risk_Level'] = df['Salary_Replacement_Ratio'].apply(assign_risk)
+    
     return df
