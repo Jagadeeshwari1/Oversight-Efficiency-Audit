@@ -9,15 +9,30 @@ st.set_page_config(page_title="Forensic Oversight Audit", layout="wide")
 # --- DATA ENGINE ---
 @st.cache_data
 def load_and_improve_data():
-    # 1. Load the Excel file (Ensure this name matches exactly in GitHub)
-    # If you renamed your file to 'audit_data.xlsx', update it here
-   df = pd.read_excel('audit_data.xlsx')
+    # 1. Load the Excel file 
+    # Ensure 'audit_data.xlsx' is in the root folder of your GitHub repo
+    try:
+        df = pd.read_excel('audit_data.xlsx', engine='openpyxl')
+    except Exception as e:
+        st.error(f"File Loading Error: {e}")
+        st.stop()
     
-    # 2. Add Contextual Improvements
+    # Clean column names (removes invisible spaces from Excel headers)
+    df.columns = df.columns.str.strip()
+
+    # 2. Safety Check & Calculation
+    # If these weren't saved in your Excel, we calculate them here to prevent KeyErrors
+    if 'Efficiency_Index' not in df.columns:
+        df['Efficiency_Index'] = df['federal_spending'] / df['annual_avg_emplvl']
+    
+    if 'Salary_Replacement_Ratio' not in df.columns:
+        df['Salary_Replacement_Ratio'] = df['Efficiency_Index'] / df['avg_annual_pay']
+
+    # 3. Add Contextual Improvements
     # Salary Equivalent: How many workers' salaries the spend represents
     df['Salary_Equivalent_Count'] = df['federal_spending'] / df['avg_annual_pay']
     
-    # 3. State Benchmarking (Z-Score)
+    # 4. State Benchmarking (Z-Score)
     def get_state(title):
         if ',' in str(title):
             return title.split(',')[-1].strip()
@@ -29,10 +44,12 @@ def load_and_improve_data():
     state_stats.columns = ['State', 'State_Mean', 'State_Std']
     
     df = df.merge(state_stats, on='State', how='left')
+    # Use fillna(0) for std to avoid division by zero errors
+    df['State_Std'] = df['State_Std'].replace(0, np.nan) 
     df['Efficiency_State_ZScore'] = (df['Efficiency_Index'] - df['State_Mean']) / df['State_Std']
     df['Efficiency_State_ZScore'] = df['Efficiency_State_ZScore'].fillna(0)
     
-    # 4. Traffic Light Risk Levels
+    # 5. Traffic Light Risk Levels
     def assign_risk(ratio):
         if ratio > 1.0: 
             return '🚨 Market Perversion'
@@ -49,15 +66,16 @@ def load_and_improve_data():
 try:
     df = load_and_improve_data()
 except Exception as e:
-    st.error(f"Error loading data: {e}")
+    st.error(f"Logic Error: {e}")
     st.stop()
 
 # --- SIDEBAR FILTERS ---
 st.sidebar.header("Forensic Search")
+risk_options = df['Audit_Risk_Level'].unique()
 risk_filter = st.sidebar.multiselect(
     "Filter by Audit Risk:",
-    options=df['Audit_Risk_Level'].unique(),
-    default=df['Audit_Risk_Level'].unique()
+    options=risk_options,
+    default=risk_options
 )
 
 search_query = st.sidebar.text_input("Search County/Area Name:")
@@ -114,3 +132,5 @@ st.dataframe(
 
 st.markdown("---")
 st.info("💡 **Auditor Note:** 'Market Perversion' is triggered when the federal cost to support a job exceeds the actual annual private-sector salary of that job.")
+
+
