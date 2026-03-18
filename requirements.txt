@@ -2,4 +2,6 @@ streamlit
 pandas
 plotly
 numpy
+scikit-learn
+openpyxl
 altair<5
