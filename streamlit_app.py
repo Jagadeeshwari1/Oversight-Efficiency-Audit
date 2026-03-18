@@ -194,9 +194,7 @@ fig_line = px.line(line_data, x='Allocated_Spending', y='oty_avg_annual_pay_pct_
 st.plotly_chart(fig_line, use_container_width=True)
 
 # --- DATA TABLE & NARRATIVE ---
-st.markdown("### 📋 The Audit Ledger")
-st.dataframe(filtered_df[['area_title', 'State', 'Allocated_Spending', 'Efficiency_Index', 'Salary_Replacement_Ratio', 'Audit_Risk_Level']]
-             .sort_values('Efficiency_Index', ascending=False), use_container_width=True)
+
 
 with st.expander("📝 Executive Auditor Summary"):
     st.markdown("""
