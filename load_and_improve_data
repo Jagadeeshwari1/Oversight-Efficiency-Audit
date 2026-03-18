@@ -1,0 +1,14 @@
+@st.cache_data
+def load_and_improve_data():
+    # Attempt to load the file with the exact name provided
+    try:
+        df = pd.read_excel('Oversight_Audit_Master (2).xlsx') 
+    except FileNotFoundError:
+        st.error("🚨 FILE NOT FOUND: Ensure 'Oversight_Audit_Master (2).xlsx' is uploaded to the root of your GitHub repo.")
+        st.stop()
+    
+    # Contextual Improvements
+    df['Salary_Equivalent_Count'] = df['federal_spending'] / df['avg_annual_pay']
+    
+    # ... (rest of your logic for State and Risk Levels stays the same)
+    return df
