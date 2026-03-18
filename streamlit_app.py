@@ -132,6 +132,13 @@ m4.metric("AVG WAGE GROWTH", f"{df['oty_avg_annual_pay_pct_chg'].mean():.2f}%")
 
 st.divider()
 
+# --- INTERPRETATION BOX ---
+st.info("""
+### 🔍 Forensic Interpretation
+This audit measures the **Taxpayer Burden Per Job**. When the "Efficiency Index" exceeds the "Average Annual Pay," it indicates a **Market Perversion**. 
+In these red-flagged areas, the government is effectively spending more to *subsidize* a position than the worker actually *earns* in the private market. This often leads to wage stagnation, as shown in the charts below.
+""")
+
 # --- VISUAL SUITE ---
 
 # Row 1: Correlation & Risk
