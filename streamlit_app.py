@@ -134,6 +134,9 @@ st.divider()
 
 # --- INTERPRETATION BOX ---
 st.info("""
+### 🔍 Forensic Interpretation
+This audit measures the **Taxpayer Burden Per Job**. When the "Efficiency Index" exceeds the "Average Annual Pay," it indicates a **Market Perversion**. 
+In these red-flagged areas, the government is effectively spending more to *subsidize* a position than the worker actually *earns* in the private market. This often leads to wage stagnation, as shown in the charts below.
 ### 🔍 The Auditor's Thesis: Input (Jobs) vs. Outcome (Wages)
 To measure **Efficiency**, we look at the **Employment Level** as our anchor. It tells us the price the taxpayer is paying to support each worker. 
 However, we use **Wage Growth** as our forensic 'check.' If the taxpayer is paying a high premium per job (High Efficiency Index) but local wages are stagnant, 
