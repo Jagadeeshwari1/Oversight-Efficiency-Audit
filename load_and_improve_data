@@ -1,14 +1,17 @@
 @st.cache_data
 def load_and_improve_data():
-    # Attempt to load the file with the exact name provided
-    try:
-        df = pd.read_excel('Oversight_Audit_Master (2).xlsx') 
-    except FileNotFoundError:
-        st.error("🚨 FILE NOT FOUND: Ensure 'Oversight_Audit_Master (2).xlsx' is uploaded to the root of your GitHub repo.")
+    import os
+    # This will show you exactly what files are in the folder
+    files_in_repo = os.listdir(".")
+    st.write("Files Streamlit can see in your repo:", files_in_repo)
+    
+    # Check if our target file is in that list
+    target_file = 'audit_data.xlsx'
+    
+    if target_file not in files_in_repo:
+        st.error(f"❌ '{target_file}' NOT FOUND. Look at the list above—is it spelled differently?")
         st.stop()
-    
-    # Contextual Improvements
-    df['Salary_Equivalent_Count'] = df['federal_spending'] / df['avg_annual_pay']
-    
-    # ... (rest of your logic for State and Risk Levels stays the same)
+        
+    df = pd.read_excel(target_file, engine='openpyxl')
+    # ... rest of your code ...
     return df
