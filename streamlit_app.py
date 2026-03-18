@@ -5,26 +5,33 @@ import numpy as np
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Forensic Audit: Federal Spending",
+    page_title="Open The Books: Forensic Audit",
     page_icon="🏛️",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
-# Custom CSS for polished Metric Cards
+# 2. Open The Books Branding (Red & Blue Gradient Header)
 st.markdown("""
     <style>
-    [data-testid="stMetricValue"] {
-        font-size: 28px;
-        color: #1E3A8A;
+    /* Gradient Header Background */
+    .header-container {
+        background: linear-gradient(90deg, #1E3A8A 0%, #B91C1C 100%);
+        padding: 40px;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        margin-bottom: 30px;
     }
-    [data-testid="stMetricLabel"] {
-        font-weight: bold;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+    /* Metric Card Styling */
+    div[data-testid="stMetric"] {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 5px solid #1E3A8A;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
     }
-    .main {
-        background-color: #f8fafc;
+    .stChatFloatingInputContainer {
+        bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -45,20 +52,16 @@ def load_and_improve_data():
     
     df['State'] = df['area_title'].apply(get_state)
 
-    # ALLOCATION LOGIC (The Math Fix)
-    state_totals = df.groupby('State').agg({
-        'annual_avg_emplvl': 'sum',
-        'federal_spending': 'max' 
-    }).reset_index()
+    # Allocation Logic
+    state_totals = df.groupby('State').agg({'annual_avg_emplvl': 'sum', 'federal_spending': 'max'}).reset_index()
     state_totals.columns = ['State', 'State_Total_Jobs', 'State_Total_Spending']
     df = df.merge(state_totals, on='State', how='left')
     df['Allocated_Spending'] = df['State_Total_Spending'] * (df['annual_avg_emplvl'] / df['State_Total_Jobs'])
 
-    # FORENSIC METRICS
+    # Metrics
     df['Efficiency_Index'] = df['Allocated_Spending'] / df['annual_avg_emplvl']
     df['Salary_Replacement_Ratio'] = df['Efficiency_Index'] / df['avg_annual_pay']
-    df['Salary_Equivalent_Count'] = df['Allocated_Spending'] / df['avg_annual_pay']
-
+    
     def assign_risk(ratio):
         if ratio > 1.0: return '🚨 Market Perversion'
         elif ratio >= 0.5: return '🟡 Watchlist'
@@ -67,79 +70,116 @@ def load_and_improve_data():
     
     return df
 
-# Initialize
 df = load_and_improve_data()
 
-# --- SIDEBAR: NAVIGATION & FILTERS ---
+# --- SIDEBAR: NAVIGATION & AI CHATBOT ---
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/8/80/Seal_of_the_United_States_Department_of_the_Treasury.svg", width=100)
-    st.title("Audit Controls")
-    st.markdown("---")
+    st.image("https://upload.wikimedia.org/wikipedia/commons/8/80/Seal_of_the_United_States_Department_of_the_Treasury.svg", width=80)
+    st.title("🛡️ Forensic Controls")
+    
+    st.markdown("### Filter Results")
     risk_filter = st.multiselect("Risk Category", options=df['Audit_Risk_Level'].unique(), default=df['Audit_Risk_Level'].unique())
-    search = st.text_input("📍 Search County/MSA")
+    search = st.text_input("📍 Search County")
+
     st.markdown("---")
-    st.info("Version 2.1: Pro-Rata Allocation Enabled")
+    st.markdown("### 🤖 AI Auditor Chat")
+    st.caption("Ask questions about the audit findings.")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "How can I help you audit these $11.16 Billion in earmarks today?"}]
+
+    for msg in st.session_state.messages:
+        st.chat_message(msg["role"]).write(msg["content"])
+
+    if chat_input := st.chat_input("Ask the Auditor..."):
+        st.session_state.messages.append({"role": "user", "content": chat_input})
+        st.chat_message("user").write(chat_input)
+        
+        # Simple AI Response Logic (Replace with LLM API call if needed)
+        response = f"I've analyzed the {len(df)} records. Currently, there are {len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion'])} critical red flags in the dataset."
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        st.chat_message("assistant").write(response)
 
 # Filter Data
 filtered_df = df[df['Audit_Risk_Level'].isin(risk_filter)]
 if search:
     filtered_df = filtered_df[filtered_df['area_title'].str.contains(search, case=False)]
 
-# --- MAIN DASHBOARD ---
-st.title("🏛️ Federal Earmark Forensic Audit")
-st.subheader("Efficiency Analysis: FY2024 Spending vs. Local Private Workforce")
+# --- HEADER ---
+st.markdown("""
+    <div class="header-container">
+        <h1 style='margin:0; font-family:serif; font-size:42px;'>🏛️ OPEN THE BOOKS</h1>
+        <p style='margin:0; font-size:20px; font-weight:lighter; opacity:0.9;'>Forensic Audit: Federal Spending Efficiency & Market Impact</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-# 1. High-Level Metrics Row
+# KPI Scorecards
 m1, m2, m3, m4 = st.columns(4)
 total_spend = df.groupby('State')['State_Total_Spending'].max().sum()
-m1.metric("Total Audited Budget", f"${total_spend/1e9:.1f}B")
-m2.metric("Efficiency Index (Avg)", f"${df['Efficiency_Index'].mean():,.0f}")
-m3.metric("Critical Red Flags", len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion']))
-m4.metric("Avg Wage Growth", f"{df['oty_avg_annual_pay_pct_chg'].mean():.2f}%")
+m1.metric("TOTAL PORTFOLIO", f"${total_spend/1e9:.1f}B")
+m2.metric("AVG EFFICIENCY INDEX", f"${df['Efficiency_Index'].mean():,.0f}")
+m3.metric("RED FLAG COUNT", len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion']))
+m4.metric("AVG WAGE GROWTH", f"{df['oty_avg_annual_pay_pct_chg'].mean():.2f}%")
 
-st.markdown("---")
+st.divider()
 
-# 2. Visualizations Row
-col_left, col_right = st.columns([2, 1])
+# --- VISUAL SUITE ---
 
-with col_left:
-    st.markdown("#### Economic Decoupling: Allocated Spend vs. Wage Growth")
-    fig = px.scatter(
-        filtered_df, x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg',
-        size='Efficiency_Index', color='Audit_Risk_Level',
-        hover_name='area_title',
-        color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
-        labels={'oty_avg_annual_pay_pct_chg': 'Wage Growth (%)', 'Allocated_Spending': 'Allocated Spend ($)'},
-        template='plotly_white', height=500
-    )
-    fig.update_layout(showlegend=True, margin=dict(l=0, r=0, b=0, t=0))
-    st.plotly_chart(fig, use_container_width=True)
+# Row 1: Correlation and Risk Distribution
+c1, c2 = st.columns([2, 1])
+with c1:
+    st.markdown("#### 📈 Decoupling Analysis: Spending vs. Wage Growth")
+    fig_scatter = px.scatter(filtered_df, x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg',
+                 size='Efficiency_Index', color='Audit_Risk_Level', hover_name='area_title',
+                 color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
+                 template='plotly_white', height=400)
+    st.plotly_chart(fig_scatter, use_container_width=True)
 
-with col_right:
-    st.markdown("#### Audit Breakdown")
-    risk_counts = filtered_df['Audit_Risk_Level'].value_counts().reset_index()
-    fig_pie = px.pie(risk_counts, values='count', names='Audit_Risk_Level', 
-                     color='Audit_Risk_Level',
-                     color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
-                     hole=0.4)
-    fig_pie.update_layout(margin=dict(l=0, r=0, b=0, t=0), height=350)
+with c2:
+    st.markdown("#### 🥧 Risk Profile Breakdown")
+    fig_pie = px.pie(filtered_df, names='Audit_Risk_Level', hole=0.4,
+                     color='Audit_Risk_Level', color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'})
+    fig_pie.update_layout(showlegend=False, height=350)
     st.plotly_chart(fig_pie, use_container_width=True)
-    
-    st.warning("Note: Red flags indicate areas where federal cost-per-job exceeds actual annual salary.")
 
-# 3. Data Definitions & Table
-with st.expander("📖 View Methodology & Audit Definitions"):
-    st.write("""
-    - **Allocated Spending:** Pro-rata distribution of state-level earmarks based on county workforce size.
-    - **Efficiency Index:** The total federal cost required to support a single private sector job in that region.
-    - **Market Perversion:** Occurs when Efficiency Index > Average Annual Pay (Ratio > 1.0).
+# Row 2: State Performance & Efficiency Distribution
+c3, c4 = st.columns(2)
+with c3:
+    st.markdown("#### 📊 Top 10 States by Efficiency Index (Cost Per Job)")
+    state_data = filtered_df.groupby('State')['Efficiency_Index'].mean().nlargest(10).reset_index()
+    fig_bar = px.bar(state_data, x='State', y='Efficiency_Index', color='Efficiency_Index', 
+                     color_continuous_scale='Blues')
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+with c4:
+    st.markdown("#### 📉 Taxpayer Burden Distribution")
+    fig_hist = px.histogram(filtered_df, x='Efficiency_Index', color='Audit_Risk_Level',
+                            color_discrete_map={'🚨 Market Perversion': '#ef4444', '🟡 Watchlist': '#f59e0b', '✅ Healthy': '#10b981'},
+                            nbins=40, template='plotly_white')
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+# Row 3: Cumulative Growth Line Chart
+st.markdown("#### 📉 Cumulative Spend vs. Wage Growth Trend")
+line_data = filtered_df.sort_values('Allocated_Spending')
+fig_line = px.line(line_data, x='Allocated_Spending', y='oty_avg_annual_pay_pct_chg', 
+                   template='plotly_white', labels={'Allocated_Spending': 'Allocated Spend ($)'})
+st.plotly_chart(fig_line, use_container_width=True)
+
+# --- CONTENT & DATA TABLE ---
+st.markdown("### 📋 The Audit Ledger")
+st.dataframe(filtered_df[['area_title', 'State', 'Allocated_Spending', 'Efficiency_Index', 'Salary_Replacement_Ratio', 'Audit_Risk_Level']]
+             .sort_values('Efficiency_Index', ascending=False), use_container_width=True)
+
+with st.expander("📝 Auditor's Narrative & Content"):
+    st.markdown("""
+    **Executive Summary:**
+    This dashboard provides a forensic look at the decoupling of federal spending from the private market. 
+    A **Market Perversion** occurs when the federal government spends more to support a job than the actual local worker takes home in salary. 
+    
+    **Key Findings:**
+    1. **Efficiency Index:** Measures the taxpayer dollar amount per local private sector job.
+    2. **Stagnation Zone:** Observe the scatter chart; areas with high spending often correlate with lower-than-average wage growth.
+    3. **Regional Hotspots:** The bar chart highlights states where federal investment is least efficient.
     """)
 
-st.markdown("#### 📋 Comprehensive Audit Ledger")
-st.dataframe(
-    filtered_df[['area_title', 'State', 'Allocated_Spending', 'Efficiency_Index', 'Salary_Replacement_Ratio', 'Audit_Risk_Level']]
-    .sort_values(by='Salary_Replacement_Ratio', ascending=False),
-    use_container_width=True
-)
-
-st.button("Export Audit Report (CSV)")
+st.button("📥 Export Full Forensic Report")
