@@ -9,29 +9,29 @@ st.set_page_config(page_title="Forensic Oversight Audit", layout="wide")
 # --- DATA ENGINE ---
 @st.cache_data
 def load_and_improve_data():
-    # 1. Load the CSV file (much more stable than XLSX on GitHub)
     try:
-        # We use 'audit_data.csv' - ensure this matches your GitHub filename exactly
+        # Load the CSV file
         df = pd.read_csv('audit_data.csv')
     except Exception as e:
         st.error(f"❌ Data Loading Error: {e}")
-        st.info("Check if 'audit_data.csv' is in your GitHub root folder and named correctly.")
+        st.info("Check if 'audit_data.csv' is in your GitHub root folder.")
         st.stop()
     
-    # Clean column names for safety
+    # Clean column names
     df.columns = df.columns.str.strip()
 
-    # 2. Logic Check & Forensic Calculations
-    # Ensuring all derived columns exist
-    if 'Efficiency_Index' not in df.columns:
-        df['Efficiency_Index'] = df['federal_spending'] / df['annual_avg_emplvl']
-    
-    if 'Salary_Replacement_Ratio' not in df.columns:
-        df['Salary_Replacement_Ratio'] = df['Efficiency_Index'] / df['avg_annual_pay']
+    # --- RECTIFICATION STEP ---
+    # Drop existing calculated columns if they exist to avoid merge conflicts (KeyError)
+    cols_to_recalc = ['Efficiency_Index', 'Salary_Replacement_Ratio', 'Salary_Equivalent_Count', 
+                      'State', 'State_Mean', 'State_Std', 'Efficiency_State_ZScore', 'Audit_Risk_Level']
+    df = df.drop(columns=[c for c in cols_to_recalc if c in df.columns])
 
+    # 1. Forensic Calculations
+    df['Efficiency_Index'] = df['federal_spending'] / df['annual_avg_emplvl']
+    df['Salary_Replacement_Ratio'] = df['Efficiency_Index'] / df['avg_annual_pay']
     df['Salary_Equivalent_Count'] = df['federal_spending'] / df['avg_annual_pay']
     
-    # 3. State Benchmarking (Z-Score)
+    # 2. State-Level Benchmarking
     def get_state(title):
         if ',' in str(title):
             return title.split(',')[-1].strip()
@@ -39,22 +39,24 @@ def load_and_improve_data():
     
     df['State'] = df['area_title'].apply(get_state)
     
+    # Calculate state stats
     state_stats = df.groupby('State')['Efficiency_Index'].agg(['mean', 'std']).reset_index()
     state_stats.columns = ['State', 'State_Mean', 'State_Std']
     
+    # Robust Merge
     df = df.merge(state_stats, on='State', how='left')
-    df['State_Std'] = df['State_Std'].replace(0, np.nan) 
-    df['Efficiency_State_ZScore'] = (df['Efficiency_Index'] - df['State_Mean']) / df['State_Std']
-    df['Efficiency_State_ZScore'] = df['Efficiency_State_ZScore'].fillna(0)
     
-    # 4. Traffic Light Risk Levels
+    # Handle the State_Std column (Fixes the KeyError)
+    if 'State_Std' in df.columns:
+        df['State_Std'] = df['State_Std'].replace(0, np.nan) 
+        df['Efficiency_State_ZScore'] = (df['Efficiency_Index'] - df['State_Mean']) / df['State_Std']
+        df['Efficiency_State_ZScore'] = df['Efficiency_State_ZScore'].fillna(0)
+    
+    # 3. Audit Risk Categories (Traffic Light)
     def assign_risk(ratio):
-        if ratio > 1.0: 
-            return '🚨 Market Perversion'
-        elif ratio >= 0.5: 
-            return '🟡 Watchlist'
-        else: 
-            return '✅ Healthy'
+        if ratio > 1.0: return '🚨 Market Perversion'
+        elif ratio >= 0.5: return '🟡 Watchlist'
+        else: return '✅ Healthy'
     
     df['Audit_Risk_Level'] = df['Salary_Replacement_Ratio'].apply(assign_risk)
     
@@ -63,32 +65,32 @@ def load_and_improve_data():
 # Initialize Data
 df = load_and_improve_data()
 
-# --- SIDEBAR FILTERS ---
+# --- INTERFACE ---
 st.sidebar.header("Forensic Search")
 risk_options = df['Audit_Risk_Level'].unique()
-risk_filter = st.sidebar.multiselect("Filter by Audit Risk:", options=risk_options, default=risk_options)
-search_query = st.sidebar.text_input("Search County Name:")
+risk_filter = st.sidebar.multiselect("Audit Risk Level:", options=risk_options, default=risk_options)
+search = st.sidebar.text_input("Search County:")
 
 # Apply Filters
 filtered_df = df[df['Audit_Risk_Level'].isin(risk_filter)]
-if search_query:
-    filtered_df = filtered_df[filtered_df['area_title'].str.contains(search_query, case=False)]
+if search:
+    filtered_df = filtered_df[filtered_df['area_title'].str.contains(search, case=False)]
 
-# --- DASHBOARD LAYOUT ---
+# --- LAYOUT ---
 st.title("🏛️ Federal Earmark Efficiency Audit")
-st.markdown("### Identifying Market Perversion via Taxpayer-to-Private Sector Ratios")
+st.markdown("### Forensic analysis of $11.16 Billion in federal spending vs. local private wages.")
 
-# Top Row Scorecards
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Audited Spend", f"${df['federal_spending'].sum():,.0f}")
-col2.metric("Avg Efficiency Index", f"${df['Efficiency_Index'].mean():,.0f}")
-col3.metric("Critical Red Flags", len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion']))
-col4.metric("Avg Wage Growth", f"{df['oty_avg_annual_pay_pct_chg'].mean():.2f}%")
+# Scorecards
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Total Audited Spend", f"${df['federal_spending'].sum():,.0f}")
+c2.metric("Avg Efficiency Index", f"${df['Efficiency_Index'].mean():,.0f}")
+c3.metric("Critical Red Flags", len(df[df['Audit_Risk_Level'] == '🚨 Market Perversion']))
+c4.metric("Avg Wage Growth", f"{df['oty_avg_annual_pay_pct_chg'].mean():.2f}%")
 
 st.divider()
 
 # Visualization
-st.header("📈 Spending vs. Local Wage Growth")
+st.header("📈 Spending vs. Wage Growth")
 fig = px.scatter(
     filtered_df, x='federal_spending', y='oty_avg_annual_pay_pct_chg',
     size='Efficiency_Index', color='Audit_Risk_Level',
@@ -98,11 +100,11 @@ fig = px.scatter(
     labels={'oty_avg_annual_pay_pct_chg': 'Wage Growth (%)', 'federal_spending': 'Federal Spend ($)'},
     template='plotly_white'
 )
-fig.add_hline(y=1.5, line_dash="dot", annotation_text="Inflation Target (1.5%)")
+fig.add_hline(y=1.5, line_dash="dot", annotation_text="Inflation Target")
 st.plotly_chart(fig, use_container_width=True)
 
-# Forensic Table
-st.header("📋 Audit Ledger: Market Perversion Rankings")
+# Ledger
+st.header("📋 Audit Ledger")
 st.dataframe(
     filtered_df[['area_title', 'State', 'federal_spending', 'Efficiency_Index', 
                  'Salary_Equivalent_Count', 'Audit_Risk_Level']]
