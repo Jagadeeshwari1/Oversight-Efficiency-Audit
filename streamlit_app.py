@@ -15,7 +15,8 @@ st.markdown("""
 # 2. Load and Improve Data (Internal Logic)
 @st.cache_data
 def load_and_improve_data():
-    df = pd.read_csv('audit_data.csv')
+    df = pd.read_xlsx ('Oversight_Audit_Master (2).xlsx
+')
     
     # Contextual Improvements
     df['Salary_Equivalent_Count'] = df['federal_spending'] / df['avg_annual_pay']
